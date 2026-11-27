@@ -1,6 +1,7 @@
 package modelo;
 
 import conexion.Conexion;
+import util.PasswordUtil;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,43 +11,37 @@ public class UsuarioDAO {
 
     // Método para validar login
     public boolean validarLogin(String correo, String contrasena) {
-
         boolean acceso = false;
-
         try {
-
             // Crear conexión
             Conexion cn = new Conexion();
             Connection con = cn.conectar();
+
+            // Encriptar la contraseña ingresada antes de comparar
+            String contrasenaHash = PasswordUtil.hash(contrasena);
 
             // Consulta SQL
             String sql = "SELECT * FROM usuarios WHERE correo=? AND contrasena=?";
 
             // Preparar consulta
             PreparedStatement ps = con.prepareStatement(sql);
-
             ps.setString(1, correo);
-            ps.setString(2, contrasena);
+            ps.setString(2, contrasenaHash);
 
             // Ejecutar consulta
             ResultSet rs = ps.executeQuery();
 
             // Validar si encontró usuario
             if (rs.next()) {
-
                 acceso = true;
-
             }
-
         } catch (Exception e) {
-
             System.out.println("Error login: " + e);
-
         }
-
         return acceso;
     }
-  // Listar usuarios para asistencia
+
+    // Listar usuarios para asistencia
     public ArrayList<Usuario> listarUsuarios() {
         ArrayList<Usuario> lista = new ArrayList<>();
         try {
@@ -66,5 +61,5 @@ public class UsuarioDAO {
             System.out.println("Error listar usuarios: " + e);
         }
         return lista;
-    }  
+    }
 }

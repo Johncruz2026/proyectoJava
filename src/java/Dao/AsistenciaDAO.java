@@ -105,4 +105,41 @@ public class AsistenciaDAO {
         }
         return lista;
     }
+    // =========================
+    // CERRAR TURNO MANUALMENTE (nuevo)
+    //
+    // registrarSalida() solo cierra el turno abierto de HOY para un
+    // usuario. Un registro abierto de un día anterior (alguien que
+    // olvidó marcar salida) nunca calza con esa condición y queda
+    // abierto para siempre — no hay forma de cerrarlo desde el flujo
+    // normal.
+    //
+    // Este método cierra un registro puntual por su id, sin importar
+    // la fecha. Es una corrección administrativa, no una marcación:
+    // se usa cuando alguien olvidó marcar su salida ese día.
+    // =========================
+
+    public boolean cerrarManualmente(int id, String horaSalida) {
+        Connection con = null;
+        try {
+            con = obtenerConexion();
+
+            String sql = "UPDATE asistencia SET hora_salida = ? WHERE id = ? AND hora_salida IS NULL";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setString(1, horaSalida);
+            ps.setInt(2, id);
+
+            int resultado = ps.executeUpdate();
+
+            System.out.println("Turno cerrado manualmente: " + (resultado > 0));
+            return resultado > 0;
+
+        } catch (SQLException e) {
+            System.out.println("Error SQL cerrarManualmente: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        } finally {
+            try { if (con != null) con.close(); } catch (SQLException e) {}
+        }
+    }
 }

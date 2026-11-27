@@ -1,6 +1,6 @@
 package servlets;
-
 import conexion.Conexion;
+import util.PasswordUtil;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
@@ -14,11 +14,9 @@ import javax.servlet.http.HttpServletResponse;
 
 @WebServlet("/RegistrarServlet")
 public class RegistrarServlet extends HttpServlet {
-
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("Access-Control-Allow-Origin", "*");
         PrintWriter out = response.getWriter();
@@ -36,7 +34,7 @@ public class RegistrarServlet extends HttpServlet {
             Connection con = cn.conectar();
 
             if (!contrasena.equals(confirmar)) {
-                out.write("{\"success\":false,\"mensaje\":\"Las contraseñas no coinciden\"}");
+                out.print("{\"success\":false,\"mensaje\":\"Las contrasenas no coinciden\"}");
                 return;
             }
 
@@ -47,7 +45,7 @@ public class RegistrarServlet extends HttpServlet {
             ResultSet rs = psValidar.executeQuery();
 
             if (rs.next()) {
-                out.write("{\"success\":false,\"mensaje\":\"El usuario ya está registrado\"}");
+                out.print("{\"success\":false,\"mensaje\":\"El usuario ya esta registrado\"}");
             } else {
                 String sql = "INSERT INTO usuarios (nombre, apellido, tipo_documento, numero_documento, correo, contrasena) VALUES (?,?,?,?,?,?)";
                 PreparedStatement ps = con.prepareStatement(sql);
@@ -56,15 +54,16 @@ public class RegistrarServlet extends HttpServlet {
                 ps.setString(3, tipoDocumento);
                 ps.setString(4, numeroDocumento);
                 ps.setString(5, correo);
-                ps.setString(6, contrasena); // Sin encriptar
+                ps.setString(6, PasswordUtil.hash(contrasena));
                 ps.executeUpdate();
-                
-                out.write("{\"success\":true,\"mensaje\":\"Registro exitoso\"}");
+                out.print("{\"success\":true,\"mensaje\":\"Usuario registrado correctamente\"}");
             }
-            
+
             con.close();
+
         } catch (Exception e) {
-            out.write("{\"success\":false,\"mensaje\":\"Error: " + e.getMessage() + "\"}");
+            e.printStackTrace();
+            out.print("{\"success\":false,\"mensaje\":\"Error en el servidor\"}");
         }
     }
 }

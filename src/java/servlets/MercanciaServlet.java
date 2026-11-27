@@ -13,7 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.annotation.WebServlet;
 
-@WebServlet("/mercanciaServlet")
+@WebServlet("/MercanciaServlet")
 public class MercanciaServlet extends HttpServlet {
 
     MercanciaDAO dao = new MercanciaDAO();
@@ -47,11 +47,9 @@ public class MercanciaServlet extends HttpServlet {
         String tipo = req.getParameter("tipo");
 
         if ("movimientos".equals(tipo)) {
-            // Listar historial de movimientos
             List<MovimientoMercancia> lista = dao.listarMovimientos();
             resp.getWriter().write(gson.toJson(lista));
         } else {
-            // Listar todos los productos de mercancia
             List<Mercancia> lista = dao.listar();
             resp.getWriter().write(gson.toJson(lista));
         }
@@ -80,12 +78,14 @@ public class MercanciaServlet extends HttpServlet {
             mov.setCantidad(Integer.parseInt(req.getParameter("cantidad")));
             mov.setObservacion(req.getParameter("observacion"));
 
-            boolean resultado = dao.registrarMovimiento(mov);
+            // registrarMovimiento ahora devuelve String: null si salió bien,
+            // o el motivo del error (por ejemplo, stock insuficiente).
+            String error = dao.registrarMovimiento(mov);
 
-            if (resultado) {
+            if (error == null) {
                 resp.getWriter().write("{\"mensaje\":\"Movimiento registrado correctamente\"}");
             } else {
-                resp.getWriter().write("{\"mensaje\":\"Error al registrar movimiento\"}");
+                resp.getWriter().write("{\"mensaje\":\"" + error + "\"}");
             }
 
         } else {

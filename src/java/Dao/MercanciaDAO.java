@@ -17,28 +17,20 @@ public class MercanciaDAO {
 
         List<Mercancia> lista = new ArrayList<>();
 
-        // SQL listar todos los productos
         String sql = "SELECT * FROM mercancia";
 
         try {
 
-            // Crear conexión
             Conexion cn = new Conexion();
             Connection con = cn.conectar();
 
-            // Preparar consulta
             PreparedStatement ps = con.prepareStatement(sql);
-
-            // Ejecutar
             ResultSet rs = ps.executeQuery();
 
-            // Recorrer resultados
             while (rs.next()) {
 
-                // Crear objeto mercancia
                 Mercancia m = new Mercancia();
 
-                // Mapear columnas de la base de datos al objeto
                 m.setId(rs.getInt("id"));
                 m.setNombreProducto(rs.getString("nombre_producto"));
                 m.setCategoria(rs.getString("categoria"));
@@ -49,7 +41,6 @@ public class MercanciaDAO {
                 m.setFechaCaducidad(rs.getString("fecha_caducidad"));
                 m.setPeso(rs.getDouble("peso"));
 
-                // Agregar a la lista
                 lista.add(m);
             }
 
@@ -69,46 +60,29 @@ public class MercanciaDAO {
 
         try {
 
-            // Crear conexión
             Conexion cn = new Conexion();
             Connection con = cn.conectar();
-
-            // =========================
-            // VALIDAR NOMBRE DUPLICADO
-            // Verifica si ya existe un producto con el mismo nombre
-            // =========================
 
             String sqlVerificar = "SELECT COUNT(*) FROM mercancia WHERE nombre_producto = ?";
 
             PreparedStatement psVerificar = con.prepareStatement(sqlVerificar);
-
-            // Enviar nombre a verificar
             psVerificar.setString(1, m.getNombreProducto());
 
-            // Ejecutar verificación
             ResultSet rs = psVerificar.executeQuery();
             rs.next();
             int cantidad = rs.getInt(1);
 
-            // Si ya existe un producto con ese nombre, no insertar
             if (cantidad > 0) {
                 return false;
             }
 
-            // =========================
-            // INSERTAR PRODUCTO NUEVO
-            // =========================
-
-            // SQL insertar con nombres de columnas correctos
             String sql = "INSERT INTO mercancia "
                     + "(nombre_producto, categoria, cantidad, ubicacion, "
                     + "estado_producto, lote, fecha_caducidad, peso) "
                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-            // Preparar consulta
             PreparedStatement ps = con.prepareStatement(sql);
 
-            // Enviar datos
             ps.setString(1, m.getNombreProducto());
             ps.setString(2, m.getCategoria());
             ps.setInt(3, m.getCantidad());
@@ -118,11 +92,50 @@ public class MercanciaDAO {
             ps.setString(7, m.getFechaCaducidad());
             ps.setDouble(8, m.getPeso());
 
-            // Ejecutar y retornar resultado
             return ps.executeUpdate() > 0;
 
         } catch (Exception e) {
             System.out.println("Error insertar mercancia: " + e);
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // =========================
+    // ACTUALIZAR MERCANCÍA (nuevo)
+    // Usado por "Renovar lote" y "Dar de baja" en el frontend:
+    // ambos reemplazan los datos del producto sin borrar el registro.
+    // =========================
+
+    public boolean actualizar(Mercancia m) {
+
+        String sql = "UPDATE mercancia SET "
+                + "nombre_producto = ?, categoria = ?, ubicacion = ?, "
+                + "estado_producto = ?, lote = ?, fecha_caducidad = ?, "
+                + "peso = ?, cantidad = ? "
+                + "WHERE id = ?";
+
+        try {
+
+            Conexion cn = new Conexion();
+            Connection con = cn.conectar();
+
+            PreparedStatement ps = con.prepareStatement(sql);
+
+            ps.setString(1, m.getNombreProducto());
+            ps.setString(2, m.getCategoria());
+            ps.setString(3, m.getUbicacion());
+            ps.setString(4, m.getEstadoProducto());
+            ps.setString(5, m.getLote());
+            ps.setString(6, m.getFechaCaducidad());
+            ps.setDouble(7, m.getPeso());
+            ps.setInt(8, m.getCantidad());
+            ps.setInt(9, m.getId());
+
+            return ps.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            System.out.println("Error actualizar mercancia: " + e);
             e.printStackTrace();
             return false;
         }
@@ -134,22 +147,16 @@ public class MercanciaDAO {
 
     public boolean eliminar(int id) {
 
-        // SQL eliminar por id
         String sql = "DELETE FROM mercancia WHERE id = ?";
 
         try {
 
-            // Crear conexión
             Conexion cn = new Conexion();
             Connection con = cn.conectar();
 
-            // Preparar consulta
             PreparedStatement ps = con.prepareStatement(sql);
-
-            // Enviar id
             ps.setInt(1, id);
 
-            // Ejecutar y retornar resultado
             return ps.executeUpdate() > 0;
 
         } catch (Exception e) {
@@ -171,34 +178,25 @@ public class MercanciaDAO {
 
         List<MovimientoMercancia> lista = new ArrayList<>();
 
-        // SQL listar todos los movimientos
-        String sql = "SELECT * FROM movimientos_mercancia";
+        String sql = "SELECT * FROM movimientos_mercancia ORDER BY id DESC";
 
         try {
 
-            // Crear conexión
             Conexion cn = new Conexion();
             Connection con = cn.conectar();
 
-            // Preparar consulta
             PreparedStatement ps = con.prepareStatement(sql);
-
-            // Ejecutar
             ResultSet rs = ps.executeQuery();
 
-            // Recorrer resultados
             while (rs.next()) {
 
-                // Crear objeto movimiento
                 MovimientoMercancia mov = new MovimientoMercancia();
 
-                // Mapear columnas de la base de datos al objeto
                 mov.setMercanciaId(rs.getInt("mercancia_id"));
                 mov.setTipo(rs.getString("tipo"));
                 mov.setCantidad(rs.getInt("cantidad"));
                 mov.setObservacion(rs.getString("observacion"));
 
-                // Agregar a la lista
                 lista.add(mov);
             }
 
@@ -211,38 +209,94 @@ public class MercanciaDAO {
     }
 
     // =========================
-    // REGISTRAR MOVIMIENTO
+    // REGISTRAR MOVIMIENTO (corregido)
+    //
+    // Antes: solo insertaba en movimientos_mercancia y nunca tocaba
+    // mercancia.cantidad. Por eso el stock quedaba desincronizado del
+    // historial (así llegó a quedar el Queso Gouda en -10).
+    //
+    // Ahora: valida el stock disponible para una salida, inserta el
+    // movimiento Y ajusta mercancia.cantidad, todo en una transacción —
+    // si algo falla a mitad de camino, no queda ninguna de las dos
+    // escrituras a medias.
+    //
+    // Cambia de boolean a String: devuelve null si todo salió bien,
+    // o el mensaje de error si algo falló (por ejemplo, stock
+    // insuficiente). MercanciaServlet debe leer este valor.
     // =========================
 
-    public boolean registrarMovimiento(MovimientoMercancia mov) {
+    public String registrarMovimiento(MovimientoMercancia mov) {
 
-        // SQL insertar movimiento con nombres de columnas correctos
-        String sql = "INSERT INTO movimientos_mercancia "
-                + "(mercancia_id, tipo, cantidad, observacion) "
-                + "VALUES (?, ?, ?, ?)";
+        Connection con = null;
 
         try {
 
-            // Crear conexión
             Conexion cn = new Conexion();
-            Connection con = cn.conectar();
+            con = cn.conectar();
+            con.setAutoCommit(false);
 
-            // Preparar consulta
-            PreparedStatement ps = con.prepareStatement(sql);
+            // 1. Si es salida, comprobar que haya stock suficiente.
+            if ("salida".equals(mov.getTipo())) {
 
-            // Enviar datos
-            ps.setInt(1, mov.getMercanciaId());
-            ps.setString(2, mov.getTipo());
-            ps.setInt(3, mov.getCantidad());
-            ps.setString(4, mov.getObservacion());
+                String sqlStock = "SELECT cantidad FROM mercancia WHERE id = ?";
+                PreparedStatement psStock = con.prepareStatement(sqlStock);
+                psStock.setInt(1, mov.getMercanciaId());
 
-            // Ejecutar y retornar resultado
-            return ps.executeUpdate() > 0;
+                ResultSet rs = psStock.executeQuery();
+
+                if (!rs.next()) {
+                    con.rollback();
+                    return "No existe un producto con ese id";
+                }
+
+                int stockActual = rs.getInt("cantidad");
+
+                if (stockActual < mov.getCantidad()) {
+                    con.rollback();
+                    return "Stock insuficiente: quedan " + stockActual + " unidades";
+                }
+            }
+
+            // 2. Insertar el movimiento en el historial.
+            String sqlInsertar = "INSERT INTO movimientos_mercancia "
+                    + "(mercancia_id, tipo, cantidad, observacion) "
+                    + "VALUES (?, ?, ?, ?)";
+
+            PreparedStatement psInsertar = con.prepareStatement(sqlInsertar);
+            psInsertar.setInt(1, mov.getMercanciaId());
+            psInsertar.setString(2, mov.getTipo());
+            psInsertar.setInt(3, mov.getCantidad());
+            psInsertar.setString(4, mov.getObservacion());
+            psInsertar.executeUpdate();
+
+            // 3. Ajustar el stock real del producto.
+            String sqlAjustar = "entrada".equals(mov.getTipo())
+                    ? "UPDATE mercancia SET cantidad = cantidad + ? WHERE id = ?"
+                    : "UPDATE mercancia SET cantidad = cantidad - ? WHERE id = ?";
+
+            PreparedStatement psAjustar = con.prepareStatement(sqlAjustar);
+            psAjustar.setInt(1, mov.getCantidad());
+            psAjustar.setInt(2, mov.getMercanciaId());
+            psAjustar.executeUpdate();
+
+            con.commit();
+            return null; // sin error
 
         } catch (Exception e) {
+
+            try {
+                if (con != null) con.rollback();
+            } catch (Exception ignorado) { }
+
             System.out.println("Error registrar movimiento: " + e);
             e.printStackTrace();
-            return false;
+            return "Error de base de datos al registrar el movimiento";
+
+        } finally {
+
+            try {
+                if (con != null) con.setAutoCommit(true);
+            } catch (Exception ignorado) { }
         }
     }
 }
